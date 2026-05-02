@@ -5,7 +5,7 @@
 | **Notation** | **Actual Input** | **Name**     | **Example** |
 | ------------ | ---------------- | ------------ | ----------- |
 | $D$          | `LL`             | double left  | ![Mazing Pattern 1](patterns/D.gif)|
-| $D'$<br>     | `RR`             | indent right | ![Mazing Pattern 1](patterns/D'.gif)|
+| $D'$<br>     | `RR`             | double right | ![Mazing Pattern 1](patterns/D'.gif)|
 
 ## Kink (K)
 | **Notation** | **Actual Input** | **Name**   | **Example** |
