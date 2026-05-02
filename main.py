@@ -31,7 +31,6 @@ class ScreenRecorder:
             return x, y, w, h
         except Exception:
             print(f"Could not find window for '{app_name}'. Is it running?")
-            print(output)
             return None
 
     def start_recording(self):
@@ -75,7 +74,7 @@ class ScreenRecorder:
         command += ["-vcodec", "libx264"]
         command += ["-pix_fmt", "yuv420p"]
         command += ["-preset", "ultrafast"]
-        command += ["-r", "60"]  # 60 fps
+        command += ["-r", "30"]  # 30 fps
 
         # Add the crop filter if we found the window
         if crop_filter:
@@ -91,7 +90,7 @@ class ScreenRecorder:
         )
 
         # Give it a moment to initialize the screen capture session
-        time.sleep(2)
+        # time.sleep(2)
 
         # Check if it crashed immediately (e.g. permission denied)
         if self.process.poll() is not None:
@@ -112,28 +111,42 @@ class ScreenRecorder:
         subprocess.run(["screencapture", "-x", filename])
 
 
-def create_gif_from_video(
-    video_file, output_gif, start_time=0, duration=5, fps=10, scale="320:-1"
-):
+def create_gif_from_video(video_file, output_gif, start_time=0, duration=5, fps=30):
     """
-    Convert video to GIF using ffmpeg
+    Convert video to a high-quality 512x512 GIF using a custom palette.
     """
+    # 1. We use a complex filter:
+    # - crop: Takes a 512x512 square from the center of your 720p video
+    # - split: Creates two streams of the video
+    # - palettegen: Uses one stream to identify the best 256 colors
+    # - paletteuse: Applies those colors to the second stream
+
+    # center_crop logic: (in_w-512)/2 : (in_h-512)/2
+    filter_complex = (
+        f"fps={fps},crop=512:512:(in_w-512)/2:(in_h-512)/2,"
+        "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"
+    )
+
     command = [
         "ffmpeg",
         "-ss",
         str(start_time),
-        "-i",
-        video_file,
         "-t",
         str(duration),
+        "-i",
+        video_file,
         "-vf",
-        f"fps={fps},scale={scale}",
+        filter_complex,
         "-loop",
         "0",
+        "-y",
         output_gif,
     ]
 
-    subprocess.run(command, check=True)
+    try:
+        subprocess.run(command, check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        print(f"GIF Conversion failed: {e.stderr.decode()}")
 
 
 class RetrocyclesPatternRecorder:
@@ -152,6 +165,7 @@ class RetrocyclesPatternRecorder:
         self.recorder = ScreenRecorder(video_file)
         self.recorder.start_recording()
 
+        pyautogui.press("p")
         for i in range(3, 0, -1):
             print(f"Recording in {i}...")
             time.sleep(1)
@@ -166,10 +180,11 @@ class RetrocyclesPatternRecorder:
         time.sleep(1.5)  # Buffer to show the finished shape
         self.recorder.stop_recording()
 
+        pyautogui.press("p")
         print(f"Converting to GIF...")
         # Add the buffer to the duration
         create_gif_from_video(
-            video_file, gif_file, start_time=0, duration=total_time + 2
+            video_file, gif_file, start_time=2, duration=(total_time + 2)
         )
         return video_file, gif_file
 
@@ -214,10 +229,10 @@ if __name__ == "__main__":
     # Notation: (Direction, Delay until next turn)
     # This creates a tight "S" curve mazing pattern
     maze_notation = [
-        ("l", 100),  # Turn left, drive for 200ms
-        ("l", 100),  # Turn right, drive for 200ms
-        ("l", 100),
-        ("r", 1),
+        ("l", 100),  # Turn left, drive for 100ms
+        ("l", 100),  # Turn left, drive for 100ms
+        ("l", 100),  # Turn left, drive for 100ms
+        ("r", 130),  # Turn right, drive for 120ms
     ]
 
     # Initialize with your specific in-game binds
