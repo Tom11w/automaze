@@ -10,28 +10,78 @@ class ScreenRecorder:
         self.output_file = output_file
         self.process: subprocess.Popen | None = None
 
+    def get_window_rect(self, app_name="Armagetron Advanced"):
+        """Get window coordinates using AppleScript"""
+        try:
+            # AppleScript to get the bounds of the window
+            # Returns: {x, y, width, height}
+            script = f'''
+            tell application "System Events"
+                tell process "{app_name}"
+                    set windowPos to position of window 1
+                    set windowSize to size of window 1
+                    return (windowPos & windowSize)
+                end tell
+            end tell
+            '''
+            output = (
+                subprocess.check_output(["osascript", "-e", script]).decode().strip()
+            )
+            x, y, w, h = map(int, output.split(","))
+            return x, y, w, h
+        except Exception:
+            print(f"Could not find window for '{app_name}'. Is it running?")
+            print(output)
+            return None
+
     def start_recording(self):
         """Start screen recording using ffmpeg"""
+        # 1. Get window position
+        rect = self.get_window_rect("Armagetron Advanced")
+        print(type(rect[0]))
+        if not rect:
+            # Fallback to full screen if window not found
+            print("Recording full screen instead.")
+            crop_filter = ""
+        else:
+            x, y, w, h = rect
+
+            # 2. Handle Retina Scaling
+            # Pyautogui gives logical size, but AVFoundation captures physical pixels.
+            # We calculate the scale (usually 2.0 on MacBooks)
+            logical_w, _ = pyautogui.size()
+
+            # Get physical screen width via ffmpeg probe or a common macOS trick:
+            # For most modern Macs, the scale is 2.
+            scale = 1
+
+            # Apply scaling to the coordinates
+            # Note: y starts from the top.
+            physical_x = x * scale
+            physical_y = y * scale
+            physical_w = w * scale
+            physical_h = h * scale
+
+            crop_filter = f"crop={physical_w}:{physical_h}:{physical_x}:{physical_y}"
+
+        # 3. Build FFMPEG command
         # Command to record screen with ffmpeg on macOS
-        # Using AVFoundation (macOS screen capture backend)
-        command = [
-            "ffmpeg",
+        command = ["ffmpeg"]
+        command += [
             "-f",
             "avfoundation",
-            "-i",
-            "3:none",  # <--- Changed from "0" to "3:none"
-            "-vcodec",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-preset",
-            "ultrafast",
-            "-r",
-            "60",  # 60 fps
-            "-y",  # Overwrite output
-            self.output_file,
-        ]
+        ]  # Using AVFoundation (macOS screen capture backend)
+        command += ["-i", "3:none"]  # Screen 3, audio none
+        command += ["-vcodec", "libx264"]
+        command += ["-pix_fmt", "yuv420p"]
+        command += ["-preset", "ultrafast"]
+        command += ["-r", "60"]  # 60 fps
 
+        # Add the crop filter if we found the window
+        if crop_filter:
+            command += ["-vf", crop_filter]
+
+        command += ["-y", self.output_file]  # Overwrite output
         # We redirect stderr to a pipe so we can read why it crashed if it fails
         self.process = subprocess.Popen(
             command,
