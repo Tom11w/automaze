@@ -12,9 +12,6 @@ class ScreenRecorder:
 
     def start_recording(self):
         """Start screen recording using ffmpeg"""
-        # First, get screen resolution
-        width, height = pyautogui.size()
-
         # Command to record screen with ffmpeg on macOS
         # Using AVFoundation (macOS screen capture backend)
         command = [
@@ -22,26 +19,34 @@ class ScreenRecorder:
             "-f",
             "avfoundation",
             "-i",
-            "0",  # Screen 0, Audio 0 (no audio)
+            "3:none",  # <--- Changed from "0" to "3:none"
             "-vcodec",
             "libx264",
+            "-pix_fmt",
+            "yuv420p",
             "-preset",
             "ultrafast",
             "-r",
             "60",  # 60 fps
-            "-crf",
-            "28",  # Quality (lower = better, but larger files)
             "-y",  # Overwrite output
             self.output_file,
         ]
 
-        self.process: subprocess.Popen = subprocess.Popen(
+        # We redirect stderr to a pipe so we can read why it crashed if it fails
+        self.process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        time.sleep(1)  # Give ffmpeg time to start
+
+        # Give it a moment to initialize the screen capture session
+        time.sleep(2)
+
+        # Check if it crashed immediately (e.g. permission denied)
+        if self.process.poll() is not None:
+            err = self.process.stderr.read().decode()
+            print(f"FFMPEG failed to start: {err}")
 
     def stop_recording(self):
         """Stop recording and save file"""
