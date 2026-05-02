@@ -82,85 +82,89 @@ def create_gif_from_video(
 
 
 class RetrocyclesPatternRecorder:
-    def __init__(self):
+    def __init__(self, left_key="a", right_key="d"):
         self.recorder = None
+        # Allow user to define their own keybinds
+        self.left_key = left_key
+        self.right_key = right_key
 
     def record_pattern(self, sequence, output_dir="patterns"):
-        """
-        Record a Retrocycles mazing pattern
-        sequence: list of ("key", duration_ms) tuples
-        """
-        # Create output directory
         os.makedirs(output_dir, exist_ok=True)
-
-        # Generate unique filename
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         video_file = os.path.join(output_dir, f"pattern_{timestamp}.mp4")
         gif_file = os.path.join(output_dir, f"pattern_{timestamp}.gif")
 
-        # Start recording
-        print(f"Starting recording to {video_file}")
         self.recorder = ScreenRecorder(video_file)
         self.recorder.start_recording()
 
-        # Add countdown for user preparation
         for i in range(3, 0, -1):
             print(f"Recording in {i}...")
             time.sleep(1)
 
-        print("Recording pattern!")
+        print("Executing Pattern!")
 
-        # Simulate the pattern
+        # Track execution time for the GIF trimmer
         start_time = time.time()
         self.simulate_pattern(sequence)
         total_time = time.time() - start_time
 
-        print(f"Pattern completed in {total_time:.2f} seconds")
-
-        # Stop recording
-        time.sleep(1)  # Brief pause at end
+        time.sleep(1.5)  # Buffer to show the finished shape
         self.recorder.stop_recording()
 
-        # Convert to GIF
-        print(f"Converting to GIF: {gif_file}")
+        print(f"Converting to GIF...")
+        # Add the buffer to the duration
         create_gif_from_video(
-            video_file, gif_file, start_time=0, duration=total_time + 1
+            video_file, gif_file, start_time=0, duration=total_time + 2
         )
-
-        print(f"Done! Files: {video_file}, {gif_file}")
         return video_file, gif_file
 
     def simulate_pattern(self, sequence):
-        """Simulate a sequence of key presses"""
+        """
+        sequence: list of (direction, duration_ms)
+        direction: 'l' or 'r'
+        duration_ms: time to drive straight AFTER the turn
+        """
         pyautogui.FAILSAFE = True
-        pyautogui.PAUSE = 0.05
+        pyautogui.PAUSE = 0.0
 
-        for key, duration_ms in sequence:
-            # Press key down
-            pyautogui.keyDown(key)
+        # Initialize the reference clock
+        start_time = time.perf_counter()
+        elapsed_target = 0.0
 
-            # Wait for specified duration
-            time.sleep(duration_ms / 1000.0)
+        for direction, duration_ms in sequence:
+            # 1. Execute the turn immediately
+            key = self.left_key if direction.lower() == "l" else self.right_key
+            pyautogui.press(key)
 
-            # Release key
-            pyautogui.keyUp(key)
+            # 2. Update the cumulative target time
+            # (Where we SHOULD be in the timeline)
+            elapsed_target += duration_ms / 1000.0
 
-            # Small pause between moves
-            time.sleep(0.05)
+            # 3. Calculate the necessary sleep to hit the next target
+            current_time = time.perf_counter()
+            actual_elapsed = current_time - start_time
+            sleep_duration = elapsed_target - actual_elapsed
+
+            # 4. Only sleep if we aren't already running behind
+            if sleep_duration > 0:
+                time.sleep(sleep_duration)
+            else:
+                # If sleep_duration is negative, the system lagged.
+                # We skip sleeping to try and 'catch up' to the timeline.
+                pass
 
 
 # Example usage
 if __name__ == "__main__":
-    # Define a mazing pattern (Left, Right, Left, Right)
-    pattern = [
-        ("left", 100),  # Hold left for 100ms
-        ("right", 100),  # Hold right for 100ms
-        ("left", 100),
-        ("right", 100),
+    # Notation: (Direction, Delay until next turn)
+    # This creates a tight "S" curve mazing pattern
+    maze_notation = [
+        ("l", 100),  # Turn left, drive for 200ms
+        ("l", 100),  # Turn right, drive for 200ms
+        ("l", 100),
+        ("r", 1),
     ]
 
-    recorder = RetrocyclesPatternRecorder()
-    video, gif = recorder.record_pattern(pattern)
-
-    print(f"Created: {video}")
-    print(f"Created: {gif}")
+    # Initialize with your specific in-game binds
+    recorder = RetrocyclesPatternRecorder(left_key="e", right_key="t")
+    recorder.record_pattern(maze_notation)
