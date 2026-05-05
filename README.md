@@ -1,4 +1,4 @@
-The purpose of this is is to define a standardised set of words for a set of common moves / pattens to make it easier to talk about and write done / notate the shape of a [maze](https://hub.retrocyclesleague.com/mazing).
+The purpose of this is to define a standardised set of words for a set of common moves / pattens to make it easier to talk about and write done / notate the shape of a [maze](https://hub.retrocyclesleague.com/mazing).
 ##  Shapes, mirrored and backwards.
 - `'` (Prime) = **Mirror** (Swap all Ls to Rs and vice versa).
 - `*` (Asterisk) = **Reverse** (The "tail" turn happens first).
